@@ -1,34 +1,36 @@
-
 import 'package:flutter_app/data/network/base_services.dart';
 import 'package:flutter_app/data/network/networkApiServices.dart';
 import 'package:flutter_app/model/user_list.dart';
 import 'package:flutter_app/res/app_url.dart';
 
-class HomeRepository{
+class HomeRepository {
   final BaseApiServices _apiServices = NetworkApiServices();
-  Future<UserList> fetchUserList()async{
-    try{
-      dynamic response  = await _apiServices.getGetApiResponse(AppUrl.userListEndPoint);
+  Future<UserList> fetchUserList() async {
+    try {
+      dynamic response =
+          await _apiServices.getGetApiResponse(AppUrl.userListEndPoint);
       return response = UserList.fromJson(response);
-    }catch(e){
-      throw e;
+    } catch (e) {
+      rethrow;
     }
   }
 
-
   Future<void> deleteUser(int userId) async {
     try {
-      String deleteUrl = "${AppUrl.deleteUserEndPoint}/$userId";  // Ensure this is correct
+      String deleteUrl =
+          "${AppUrl.deleteUserEndPoint}/$userId"; // Ensure this is correct
       await _apiServices.getDeleteApiResponse(deleteUrl);
     } catch (e) {
       print("Error deleting user: $e");
-      throw Exception("Error deleting user: $e");  // Rethrow the error for the ViewModel to handle
+      throw Exception(
+          "Error deleting user: $e"); // Rethrow the error for the ViewModel to handle
     }
   }
 
   Future<void> createUser(Map<String, dynamic> userData) async {
     try {
-      await _apiServices.getPostApiResponse(AppUrl.createUserEndPoint, userData);
+      await _apiServices.getPostApiResponse(
+          AppUrl.createUserEndPoint, userData);
     } catch (e) {
       throw Exception("Error creating user: $e");
     }
@@ -48,4 +50,3 @@ class HomeRepository{
     }
   }*/
 }
-
