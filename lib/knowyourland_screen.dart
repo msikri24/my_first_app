@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class KnowYourLandScreen extends StatefulWidget {
+  const KnowYourLandScreen({super.key});
+
   @override
   _KnowYourLandScreenState createState() => _KnowYourLandScreenState();
 }
@@ -20,74 +22,72 @@ class _KnowYourLandScreenState extends State<KnowYourLandScreen> {
   final String stateCode = "06"; // Assuming Haryana
 
   Future<void> fetchJwtToken() async {
-    final response = await http.post(
-      Uri.parse('https://vc.jamabandi.nic.in/LRDS/api/account/gettoken'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        "Email": "webhalrisMobileApp@gmail.com",
-        "Password": "Password@123",
-      }),
-    );
+    try {
+      final response = await http.post(
+        Uri.parse('https://vc.jamabandi.nic.in/LRDS/api/account/gettoken'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          "Email": "webhalrisMobileApp@gmail.com",
+          "Password": "Password@123",
+        }),
+      );
+      print("Response Body: ${response.body}");
 
-    if (response.statusCode == 200) {
-      setState(() {
-        jwtToken = jsonDecode(response.body)['token'];
-      });
-      fetchDistricts();
-    } else {
-      print("Failed to get token");
+      print(" API Response: ${response.statusCode}");
+      print(" API Body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        // Try to decode the response properly
+        try {
+          final decoded = jsonDecode(response.body);
+          setState(() {
+            jwtToken = decoded['token'];
+          });
+          print(" JWT Token: $jwtToken");
+          fetchDistricts();
+        } catch (e) {
+          print(" JSON Decode Error: $e");
+          print(
+              " Response is not valid JSON. API might be returning plain text.");
+        }
+      } else {
+        print("API Error: ${response.statusCode} - ${response.reasonPhrase}");
+      }
+    } catch (e) {
+      print(" Error fetching token: $e");
     }
   }
 
   Future<void> fetchDistricts() async {
-    if (jwtToken == null) return;
-
-    final response = await http.get(
-      Uri.parse(
-          'https://vc.jamabandi.nic.in/LRDS/api/LRDataService/GetDistrict2/$stateCode/json'),
-      headers: {'Authorization': 'Bearer $jwtToken'},
-    );
-
-    if (response.statusCode == 200) {
-      setState(() {
-        districts = jsonDecode(response.body);
-      });
-    } else {
-      print("Failed to fetch districts");
+    if (jwtToken == null) {
+      print("JWT Token is null, cannot fetch districts.");
+      return;
     }
-  }
 
-  Future<void> fetchTehsils(String districtCode) async {
-    final response = await http.get(
-      Uri.parse(
-          'https://vc.jamabandi.nic.in/LRDS/api/LRDataService/GetTehsilWH/$stateCode/$districtCode/json'),
-      headers: {'Authorization': 'Bearer $jwtToken'},
-    );
+    try {
+      final response = await http.get(
+        Uri.parse(
+            'https://vc.jamabandi.nic.in/LRDS/api/LRDataService/GetDistrict2/$stateCode/json'),
+        headers: {'Authorization': 'Bearer $jwtToken'},
+      );
 
-    if (response.statusCode == 200) {
-      setState(() {
-        tehsils = jsonDecode(response.body);
-        selectedTehsil = null;
-        villages = [];
-      });
-    } else {
-      print("Failed to fetch tehsils");
-    }
-  }
+      print(" District API Response: ${response.body}");
 
-  Future<void> fetchVillages(String districtCode, String tehsilCode) async {
-    final response = await http.get(
-      Uri.parse(
-          'https://vc.jamabandi.nic.in/LRDS/api/LRDataService/GetVillages/$stateCode/$districtCode/$tehsilCode/json'),
-      headers: {'Authorization': 'Bearer $jwtToken'},
-    );
-
-    if (response.statusCode == 200) {
-      setState(() {
-        villages = jsonDecode(response.body);
-      });
-    } else {
-      print("Failed to fetch villages");
+      if (response.statusCode == 200) {
+        final decodedResponse = jsonDecode(response.body);
+        if (decodedResponse is List) {
+          setState(() {
+            districts = decodedResponse;
+          });
+          print("Districts Fetched: ${districts.length}");
+        } else {
+          print("Unexpected API Response Format: $decodedResponse");
+        }
+      } else {
+        print("Failed to fetch districts. Status: ${response.statusCode}");
+      }
+    } catch (e) {
+      print(" Error fetching districts: $e");
     }
   }
 
@@ -106,6 +106,10 @@ class _KnowYourLandScreenState extends State<KnowYourLandScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            ElevatedButton(
+              onPressed: fetchJwtToken, // Manually fetch data
+              child: Text("Refresh Data"),
+            ),
             Text("Select District:"),
             DropdownButton<String>(
               value: selectedDistrict,
@@ -122,52 +126,9 @@ class _KnowYourLandScreenState extends State<KnowYourLandScreen> {
                   selectedDistrict = value;
                   selectedTehsil = null;
                   selectedVillage = null;
-                  fetchTehsils(value!);
                 });
               },
             ),
-            if (tehsils.isNotEmpty) ...[
-              SizedBox(height: 20),
-              Text("Select Tehsil:"),
-              DropdownButton<String>(
-                value: selectedTehsil,
-                isExpanded: true,
-                hint: Text("Choose a Tehsil"),
-                items: tehsils.map((tehsil) {
-                  return DropdownMenuItem(
-                    value: tehsil['Code'].toString(),
-                    child: Text(tehsil['Name'].toString()),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    selectedTehsil = value;
-                    selectedVillage = null;
-                    fetchVillages(selectedDistrict!, value!);
-                  });
-                },
-              ),
-            ],
-            if (villages.isNotEmpty) ...[
-              SizedBox(height: 20),
-              Text("Select Village:"),
-              DropdownButton<String>(
-                value: selectedVillage,
-                isExpanded: true,
-                hint: Text("Choose a Village"),
-                items: villages.map((village) {
-                  return DropdownMenuItem(
-                    value: village['Code'].toString(),
-                    child: Text(village['Name'].toString()),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    selectedVillage = value;
-                  });
-                },
-              ),
-            ],
           ],
         ),
       ),
